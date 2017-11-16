@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block body %}
+{% if error %}
+<div><p>{{ error }}</p></div>
+{% else %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-4 col-md-offset-4">
+            <div class="login-panel panel panel-default">
+                <div class="panel-heading">
+                    <h3 class="panel-title">Log in</h3>
+                </div>
+                <div class="panel-body">
+                    <form role="form" method="POST" action="{{ url_for('auth') }}">
+                        <fieldset>
+                            <div class="form-group">
+                                <input class="form-control" type="text" name="username" placeholder="Username" autofocus>
+                            </div>
+                            <div class="form-group">
+                                <input class="form-control" type="password" name="pass" placeholder="Password" autofocus>
+                            </div>
+                            <button type="submit" class="btn btn-lg btn-suuccess btn-block">Log in</button>
+                        </fieldset>
+                    </form>
+                    <br>
+                    <div>
+                     Don't have an account ? <a href="{{ url_for('register') }}">Sign up here</a>.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endif %}
+{% endblock %}

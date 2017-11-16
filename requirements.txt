@@ -1,0 +1,13 @@
+python-socketio
+Flask
+Flask-SocketIO
+flask-pymongo
+Jinja2
+MarkupSafe
+Werkzeug
+greenlet
+gevent
+gevent-websocket
+itsdangerous
+ujson
+bcrypt

@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block header %}
+{% endblock %}
+{% block body %}
+
+<script type="text/javascript" src="{{ url_for('static', filename='js/form.js') }}">
+
+</script>
+
+<div class="container">
+    <div class="row" style="padding-top:40px;"></div>
+    <h3 class="text-center">ECHOGRAM</h3>
+    <br/><br/>
+
+    <div class="col-md-12">
+        <div class="panel panel-info">
+            <div class="panel-heading">
+                <strong><span class="glyphicon glyphicon-list"></span> History </strong>
+            </div>
+            <div class="panel-body fixed-panel">
+                <ul class="media-list" id="messages">
+                    {% for message in context.messages %}
+                    <li class="media">
+                        <div class="media-body">
+                            <div class="media">
+                                <div class="media-body">
+                                    {{ message.text }}
+                                    <br/><small class="text-muted">
+                                    {{ message.author }}
+                                </small>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="panel-footer">
+                <div class="input-group">
+                    <input type="text" class="form-control" name="text" id="myMessage" placeholder="Input">
+                    <span class="input-group-btn">
+                        <button class="btn btn-info" type="button" id="sendbutton">Send
+                            <span class="glyphicon glyphicon-envelope"></span>
+                        </button>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
