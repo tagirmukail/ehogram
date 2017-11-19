@@ -13,7 +13,11 @@ CHAT_SETTINGS = CHAT_SETTINGS
 
 app.config['SECRET_KEY'] = CHAT_SETTINGS.SECRET_KEY
 app.config["MONGO_DBNAME"] = CHAT_SETTINGS.MONGO_DBNAME
-app.config['MONGO_URI'] = CHAT_SETTINGS.MONGO_URI
+app.config['MONGO_HOST'] = CHAT_SETTINGS.MONGO_HOST
+app.config['MONGO_PORT'] = CHAT_SETTINGS.MONGO_PORT
+app.config['MONGO_USERNAME'] = CHAT_SETTINGS.MONGO_USERNAME
+app.config['MONGO_PASSWORD'] = CHAT_SETTINGS.MONGO_PASSWORD
+app.config['MONGO_AUTO_START_REQUEST'] = CHAT_SETTINGS.MONGO_AUTO_START_REQUEST
 app.config['DEBUG'] = CHAT_SETTINGS.DEBUG
 app.config['TRAP_HTTP_EXCEPTIONS'] = CHAT_SETTINGS.TRAP_HTTP_EXCEPTIONS
 
@@ -86,7 +90,7 @@ def auth():
             session['username'] = nick
             return redirect(url_for('recv'))
     # в случае неверно введенных данных сообщить.
-    return abort(401,'error, there is no visitor with such a nickname and password.')
+    return abort(401, 'there is no visitor with such a nickname and password.')
 
 @app.route('/REGISTER/', methods=['POST','GET'])
 def register():
@@ -134,6 +138,17 @@ def internal_server_error(error):
     """Обработка исключения 500"""
     message = '500 Internal Server Error!'
     return render_template('error.html', message=message), 500
+
+@app.errorhandler(401)
+def unauthorized(error):
+    """Обработка исключения 401"""
+    return render_template('error.html', message=error), 401
+
+@app.errorhandler(403)
+def forbidden(error):
+    """Обработка исключения 403"""
+    message = '403 Forbidden!'
+    return render_template('error.html', message=message), 403
 
 if __name__ == '__main__':
     socketio.run(app,
