@@ -11,3 +11,4 @@ gevent-websocket
 itsdangerous
 ujson
 bcrypt
+Flask-mail

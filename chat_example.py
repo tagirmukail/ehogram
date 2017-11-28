@@ -2,30 +2,23 @@
 from flask import Flask, render_template, url_for, request, session, redirect, jsonify, abort
 from flask_pymongo import PyMongo
 from flask_socketio import SocketIO, send
+from flask_mail import Mail, Message
 import bcrypt
-from datetime import timedelta
-from config import CHAT_SETTINGS
+from itsdangerous import URLSafeTimedSerializer
 from help_functions import *
+from config import *
 
 app = Flask(__name__)
 
-CHAT_SETTINGS = CHAT_SETTINGS
+app.config.from_pyfile('config.py')
 
-app.config['SECRET_KEY'] = CHAT_SETTINGS.SECRET_KEY
-app.config["MONGO_DBNAME"] = CHAT_SETTINGS.MONGO_DBNAME
-app.config['MONGO_HOST'] = CHAT_SETTINGS.MONGO_HOST
-app.config['MONGO_PORT'] = CHAT_SETTINGS.MONGO_PORT
-app.config['MONGO_USERNAME'] = CHAT_SETTINGS.MONGO_USERNAME
-app.config['MONGO_PASSWORD'] = CHAT_SETTINGS.MONGO_PASSWORD
-app.config['MONGO_AUTO_START_REQUEST'] = CHAT_SETTINGS.MONGO_AUTO_START_REQUEST
-app.config['DEBUG'] = CHAT_SETTINGS.DEBUG
-app.config['TRAP_HTTP_EXCEPTIONS'] = CHAT_SETTINGS.TRAP_HTTP_EXCEPTIONS
+mail = Mail(app)
+
+s = URLSafeTimedSerializer('Thisissecret!')
 
 mongo = PyMongo(app)
 
 socketio = SocketIO(app)
-
-app.permanent_session_lifetime = timedelta(minutes=CHAT_SETTINGS.PERMANENT_SESSION_LIFETIME)
 
 @app.route('/RECV/', methods=['GET'])
 def recv():
@@ -83,7 +76,7 @@ def auth():
     users = mongo.db.users
     login_user = users.find_one({'name': nick})
     # Если пользователь существует в базе.
-    if login_user:
+    if login_user and login_user['confirm'] == 'True':
         # проверка введенного пользователем пароля.
         if bcrypt.hashpw(pwd.encode('utf-8'),
                     login_user['password'].encode('utf-8')) == login_user['password'].encode('utf-8'):
@@ -98,23 +91,47 @@ def register():
     if request.method == 'POST':
         nick = request.form['username']
         pwd = request.form['pass']
+        email = request.form['email']
     if request.method == 'GET':
         nick = request.args.get('nick', '')
         pwd = request.args.get('pwd', '')
+        email = request.args.get('email', '')
     if len(nick) >= 4 and len(pwd) >= 8:
         users = mongo.db.users
         existing_user = users.find_one({'name': nick})
         # Если новый пользователь
         if existing_user is None:
+            # формируем токен для email
+            token = s.dumps(email, salt='email-confirm')
+            # Назначаем отправителя,получателя и тему email
+            msg = Message('Confirm Email', sender=MAIL_USERNAME, recipients=[email])
+            # ссылка для окончательной регистрации
+            link = url_for('confirm_email', token=token, _external=True)
+            # тело сообщения
+            msg.body = 'Your link is {}'.format(link)
+            # отправка email
+            mail.send(msg)
             # хеш пароля
             hashpass = bcrypt.hashpw(pwd.encode('utf-8'), bcrypt.gensalt())
             # сохраняем пользователя в базе
-            users.insert({'name': nick, 'password': hashpass})
-            session['username'] = nick
+            users.insert({'name': nick, 'password': hashpass,
+                          'email': email, 'confirm': 'False'})
             return redirect(url_for('index'))
         # Если пользователь существует выводим сообщение
         return abort(403, 'That username already exists!')
     return render_template('register.html')
+
+@app.route('/confirm_email/<token>')
+def confirm_email(token):
+    """После перехода по ссылке из письма"""
+    try:
+        users = mongo.db.users
+        email = s.loads(token, salt='email-confirm', max_age=300)
+        users.update_one({'email': email}, {'$set': {'confirm': 'True'}})
+    except:
+        users.delete_one({'email': email})
+        return abort(400, 'The token is bad!')
+    return redirect(url_for('index'))
 
 @app.route('/SEND/', methods=['GET'])
 def sender():
@@ -150,7 +167,13 @@ def forbidden(error):
     message = '403 Forbidden!'
     return render_template('error.html', message=message), 403
 
+@app.errorhandler(400)
+def badrequest(error):
+    """400 исключение"""
+    message = 'Bad request!'
+    return render_template('error.html', message=message), 400
+
 if __name__ == '__main__':
     socketio.run(app,
-                 host=CHAT_SETTINGS.host,
-                 port=CHAT_SETTINGS.port)
+                 host=host,
+                 port=port)
