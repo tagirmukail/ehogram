@@ -1,26 +1,18 @@
 # -*- coding: utf-8 -*-
-from flask import Flask, render_template, url_for, request, session, redirect, jsonify, abort
-from flask_pymongo import PyMongo
-from flask_socketio import SocketIO, send
-from flask_mail import Mail, Message
 import bcrypt
+from flask import render_template, flash, url_for, request, session, redirect, jsonify, abort
+from flask_mail import Message
+from flask_socketio import send
 from itsdangerous import URLSafeTimedSerializer
+from app import app, mail, mongo, socketio, bootstrap
+from app.config import *
 from help_functions import *
-from config import *
-
-app = Flask(__name__)
-
-app.config.from_pyfile('config.py')
-
-mail = Mail(app)
+from forms import *
+# from werkzeug.security import generate_password_hash, check_password_hash
 
 s = URLSafeTimedSerializer('Thisissecret!')
 
-mongo = PyMongo(app)
-
-socketio = SocketIO(app)
-
-@app.route('/RECV/', methods=['GET'])
+@app.route('/recv/', methods=['GET'])
 def recv():
     """Если пользователь успешно авторизовался,
     открывается страница с сообщениями
@@ -56,7 +48,7 @@ def index():
     if 'username' in session:
         return redirect(url_for('recv'))
     """В противном случае остаемся на странице входа"""
-    return render_template('auth.html')
+    return redirect(url_for('auth'))
 
 @app.route('/logout/')
 def logout():
@@ -64,78 +56,104 @@ def logout():
     session.pop('username', None)
     return redirect(url_for('index'))
 
-@app.route('/AUTH/', methods=['POST','GET'])
+@app.route('/auth/', methods=['POST','GET'])
 def auth():
     """Авторизация пользователя"""
-    if request.method == 'GET':
-        nick = request.args.get('nick')
-        pwd = request.args.get('pwd')
-    else:
-        nick = request.form['username']
-        pwd = request.form['pass']
+    form = LoginForm()
     users = mongo.db.users
-    login_user = users.find_one({'name': nick})
+    login_user = users.find_one({'name': form.nick.data})
     # Если пользователь существует в базе.
-    if login_user and login_user['confirm'] == 'True':
+    if login_user and login_user['email'] != '':
         # проверка введенного пользователем пароля.
-        if bcrypt.hashpw(pwd.encode('utf-8'),
+        if bcrypt.hashpw(form.password.data.encode('utf-8'),
                     login_user['password'].encode('utf-8')) == login_user['password'].encode('utf-8'):
-            session['username'] = nick
+            session['username'] = form.nick.data
             return redirect(url_for('recv'))
-    # в случае неверно введенных данных сообщить.
-    return abort(401, 'there is no visitor with such a nickname and password.')
+        flash('Invalid nickname or password')
+    return render_template('auth.html', form=form)
 
-@app.route('/REGISTER/', methods=['POST','GET'])
-def register():
-    """Регистрация пользователя"""
-    if request.method == 'POST':
-        nick = request.form['username']
-        pwd = request.form['pass']
-        email = request.form['email']
+@app.route('/AUTH/')
+def auth_args():
+    """API - авторизация пользователя."""
     if request.method == 'GET':
         nick = request.args.get('nick', '')
         pwd = request.args.get('pwd', '')
-        email = request.args.get('email', '')
-    if len(nick) >= 4 and len(pwd) >= 8:
         users = mongo.db.users
-        existing_user = users.find_one({'name': nick})
-        # Если новый пользователь
-        if existing_user is None:
-            # формируем токен для email
-            token = s.dumps(email, salt='email-confirm')
-            # Назначаем отправителя,получателя и тему email
-            msg = Message('Confirm Email', sender=MAIL_USERNAME, recipients=[email])
-            # ссылка для окончательной регистрации
-            link = url_for('confirm_email', token=token, _external=True)
-            # тело сообщения
-            msg.body = 'Your link is {}'.format(link)
-            # отправка email
-            mail.send(msg)
-            # хеш пароля
-            hashpass = bcrypt.hashpw(pwd.encode('utf-8'), bcrypt.gensalt())
-            # сохраняем пользователя в базе
-            users.insert({'name': nick, 'password': hashpass,
-                          'email': email, 'confirm': 'False'})
-            return redirect(url_for('index'))
-        # Если пользователь существует выводим сообщение
-        return abort(403, 'That username already exists!')
-    return render_template('register.html')
+        login_user = users.find_one({'name': nick})
+        if login_user and login_user['email'] != '':
+            if bcrypt.hashpw(pwd.encode('utf-8'),
+                             login_user['password'].encode('utf-8')) == login_user['password'].encode('utf-8'):
+                session['username'] = nick
+                return redirect(url_for('recv'))
+            flash('Invalid nickname or password')
+        return redirect(url_for('auth'))
 
-@app.route('/confirm_email/<token>')
-def confirm_email(token):
+
+@app.route('/register/', methods=['POST', 'GET'])
+def register():
+    """Регистрация пользователя."""
+    form = RegistrationForm()
+    users = mongo.db.users
+    if form.validate_on_submit():
+        # формируем токен
+        token = s.dumps(form.email.data, salt='email-confirm')
+        # формируем сообщение с ссылкой для подтверждения регистрации.
+        msg = Message('Confirm Email', sender=MAIL_USERNAME, recipients=[form.email.data])
+        link = url_for('confirm_email', nick=form.nick.data, token=token, _external=True)
+        msg.body = 'Your link is {}'.format(link)
+        # отпавляем сообщение с ссылкой
+        mail.send(msg)
+        # хеш пароля
+        hashpass = bcrypt.hashpw(form.password.data.encode('utf-8'), bcrypt.gensalt())
+        users.insert({'name': form.nick.data,
+                      'email': '',
+                      'password': hashpass})
+        flash('Check your mailbox')
+        return redirect(url_for('index'))
+    return render_template('register.html', form=form)
+
+@app.route('/REGISTER/')
+def register_args():
+    """API для регистрации пользователя."""
+    if request.method == 'GET':
+        nick = request.args.get('nick', '')
+        email = request.args.get('email', '')
+        pwd = request.args.get('pwd', '')
+        pwd2 = request.args.get('pwd2', '')
+        if pwd == pwd2:
+            users = mongo.db.users
+            token = s.dumps(email, salt='email-confirm')
+            msg = Message('Confirm Email', sender=MAIL_USERNAME, recipients=[email])
+            link = url_for('confirm_email', nick=nick, token=token, _external=True)
+            msg.body = 'Your link is {}'.format(link)
+            mail.send(msg)
+
+            hashpass = bcrypt.hashpw(pwd.encode('utf-8'), bcrypt.gensalt())
+            users.insert({'name': nick,
+                          'email': '',
+                          'password': hashpass})
+            flash('Check your mailbox')
+            return redirect(url_for('auth'))
+        flash('Invalid password')
+        return redirect(url_for('register'))
+
+@app.route('/confirm_email/<nick>/<token>')
+def confirm_email(nick, token):
     """После перехода по ссылке из письма"""
+    users = mongo.db.users
     try:
-        users = mongo.db.users
         email = s.loads(token, salt='email-confirm', max_age=300)
-        users.update_one({'email': email}, {'$set': {'confirm': 'True'}})
+        # Обновить email пользователя после перехода по ссылке.
+        users.update_one({'name': nick}, {'$set': {'email': email}})
     except:
-        users.delete_one({'email': email})
+        # в случае ошибки удалить пользователя из бд.
+        users.delete_one({'name': nick})
         return abort(400, 'The token is bad!')
     return redirect(url_for('index'))
 
 @app.route('/SEND/', methods=['GET'])
 def sender():
-    """Отправка сообщения"""
+    """API - отправка сообщения"""
     if 'username' in session:
         nick = request.args.get('nick', '')
         msg = request.args.get('msg', '')
@@ -172,8 +190,3 @@ def badrequest(error):
     """400 исключение"""
     message = 'Bad request!'
     return render_template('error.html', message=message), 400
-
-if __name__ == '__main__':
-    socketio.run(app,
-                 host=host,
-                 port=port)

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% import "bootstrap/wtf.html" as wtf %}
 {% block body %}
 {% if error %}
 <div><p>{{ error }}</p></div>
@@ -12,15 +13,12 @@
                 </div>
                 <div class="panel-body">
                     <form role="form" method="POST" action="{{ url_for('auth') }}">
-                        <fieldset>
-                            <div class="form-group">
-                                <input class="form-control" type="text" name="username" placeholder="Username" autofocus>
-                            </div>
-                            <div class="form-group">
-                                <input class="form-control" type="password" name="pass" placeholder="Password" autofocus>
-                            </div>
-                            <button type="submit" class="btn btn-lg btn-suuccess btn-block">Log in</button>
-                        </fieldset>
+                        {{ wtf.quick_form(form) }}
+                        <br>
+                        {% for message in get_flashed_messages() %}
+                        <div style="color:red; background-color:yellow">{{ message }}</div>
+                        {% endfor %}
+                        <br>
                     </form>
                     <br>
                     <div>

@@ -12,3 +12,4 @@ itsdangerous
 ujson
 bcrypt
 Flask-mail
+flask-wtf
