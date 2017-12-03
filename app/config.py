@@ -15,8 +15,8 @@ host = '127.0.0.1'
 port = 5000
 
 MAIL_SERVER = 'smtp.mail.ru'
-MAIL_USERNAME = 'mukailov1991@mail.ru   '
-MAIL_PASSWORD = 'MTagirdag05reg'
+MAIL_USERNAME = 'mail'
+MAIL_PASSWORD = 'password'
 MAIL_PORT = 465
 MAIL_USE_SSL = True
 MAIL_USE_TLS = False
