@@ -9,5 +9,5 @@ Chat
 4.	Запускаем сервер mongodb.
 		$ service mongod start
 5. 	Запускаем приложение:
-		$ python chat_example.py
+		$ python run.py
 
