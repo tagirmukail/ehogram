@@ -3,9 +3,7 @@ from flask import Flask
 from flask_mail import Mail
 from flask_pymongo import PyMongo
 from flask_socketio import SocketIO
-from itsdangerous import URLSafeTimedSerializer
 from flask_bootstrap import Bootstrap
-from app.config import *
 from help_functions import *
 
 app = Flask(__name__)

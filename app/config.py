@@ -5,7 +5,7 @@ MONGO_HOST = '127.0.0.1'
 MONGO_PORT = '27017'
 MONGO_DBNAME = 'admin'
 MONGO_USERNAME = 'root'
-MONGO_PASSWORD = 'password'
+MONGO_PASSWORD = 'nogiruki'
 MONGO_AUTO_START_REQUEST = 'True'
 
 SECRET_KEY = 'mysecret!'
